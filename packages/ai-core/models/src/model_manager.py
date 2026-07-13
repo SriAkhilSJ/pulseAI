@@ -32,11 +32,9 @@ class TokenManager:
             if isinstance(content, str):
                 total_chars += len(content)
             elif isinstance(content, list):
-                # Handle multimodal content blocks
                 for block in content:
                     if isinstance(block, dict) and block.get("type") == "text":
                         total_chars += len(block.get("text", ""))
-        # ~4 chars per token + 4 tokens overhead per message
         return max(1, (total_chars // 4) + (len(messages) * 4))
 
 
@@ -106,13 +104,12 @@ class ModelManager:
                 }
 
             except Exception as exc:
-                # Check if it's a RateLimitError or connection outage
                 exc_type_name = type(exc).__name__
-                if "RateLimit" in exc_type_name or "Connection" in exc_type_name or "API" in exc_type_name:
+                # Trigger failover on rate limits, connection drops, API errors, 5xx server errors, or 404/not-found models
+                if any(k in exc_type_name for k in ("RateLimit", "Connection", "API", "Timeout", "ServiceUnavailable", "NotFound", "InternalServer")):
                     last_error = exc
                     continue
                 else:
-                    # If it's another error (like invalid prompt schema), raise immediately
                     raise exc
 
         raise CircuitBreakerError(f"All models exhausted for request. Last error: {last_error}")
