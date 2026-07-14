@@ -10,7 +10,7 @@ from typing import Any, Dict, List
 try:
     import litellm
 except ImportError:
-    litellm = None  # Handled cleanly in unit tests via mocking
+    litellm = None
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,6 @@ class TokenManager:
 
     @staticmethod
     def estimate_tokens(messages: List[Dict[str, str]], model: str = "") -> int:
-        """Estimate token count for a list of messages using ~4 chars/token heuristic + message overhead."""
         total_chars = 0
         for msg in messages:
             content = msg.get("content", "")
@@ -44,7 +43,7 @@ class ModelManager:
     DEFAULT_FALLBACKS = {
         "groq/llama-3.3-70b-versatile": [
             "openrouter/meta-llama/llama-3.3-70b-instruct",
-            "gemini/gemini-1.5-pro-latest"
+            "groq/llama-3.1-8b-instant"
         ],
         "claude-3-5-sonnet-20241022": [
             "openrouter/anthropic/claude-3.5-sonnet",
@@ -52,7 +51,7 @@ class ModelManager:
         ],
         "gpt-4o": [
             "openrouter/openai/gpt-4o",
-            "claude-3-5-sonnet-20241022"
+            "openrouter/meta-llama/llama-3.3-70b-instruct"
         ]
     }
 
@@ -60,14 +59,12 @@ class ModelManager:
         self.fallbacks = fallbacks if fallbacks is not None else self.DEFAULT_FALLBACKS.copy()
 
     def get_fallback_models(self, primary_model: str) -> List[str]:
-        """Return the ordered list of fallback models for a given primary model."""
         return self.fallbacks.get(primary_model, [
             "openrouter/meta-llama/llama-3.3-70b-instruct",
-            "groq/llama-3.3-70b-versatile"
+            "groq/llama-3.1-8b-instant"
         ])
 
     def complete(self, messages: List[Dict[str, Any]], model: str, **kwargs) -> Dict[str, Any]:
-        """Execute completion request with automatic fallback on rate limits or API connection errors."""
         if litellm is None:
             raise RuntimeError("litellm package is required for ModelManager.complete()")
 
@@ -105,8 +102,7 @@ class ModelManager:
 
             except Exception as exc:
                 exc_type_name = type(exc).__name__
-                # Trigger failover on rate limits, connection drops, API errors, 5xx server errors, or 404/not-found models
-                if any(k in exc_type_name for k in ("RateLimit", "Connection", "API", "Timeout", "ServiceUnavailable", "NotFound", "InternalServer")):
+                if any(k in exc_type_name for k in ("RateLimit", "Connection", "API", "Timeout", "ServiceUnavailable", "NotFound", "InternalServer", "BadRequest")):
                     last_error = exc
                     continue
                 else:

@@ -6,12 +6,11 @@ Aggregates all sandboxed tools across all sub-packages into a unified dispatcher
 """
 import sys
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 
 def _ensure_paths_loaded():
     curr = Path(__file__).resolve()
-    # Ascend until we find 'packages' directory or repo root
     repo_root = curr.parents[4] if len(curr.parents) >= 5 else curr.parents[-1]
     for p in curr.parents:
         if (p / "packages" / "tools").exists():
@@ -68,7 +67,6 @@ class UnifiedToolRegistry:
         self.tools[tool_instance.name] = tool_instance
 
     def list_tools(self) -> List[Dict[str, Any]]:
-        """Return a structured summary list of all registered tools and their mutation status."""
         return [
             {
                 "name": t.name,
@@ -77,6 +75,46 @@ class UnifiedToolRegistry:
             }
             for t in self.tools.values()
         ]
+
+    def list_tools_schema(self, allowed_names: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+        """Return OpenAI-compatible function calling schemas for registered tools."""
+        schemas = []
+        for name, tool in self.tools.items():
+            if allowed_names is not None and name not in allowed_names:
+                continue
+            
+            # Build basic parameters schema based on tool requirements
+            properties = {}
+            required = []
+            if "read_file" in name or "write_file" in name or "diff" in name or "screenshot" in name or "diagnostics" in name or "untyped" in name or "jsdoc" in name:
+                properties["path"] = {"type": "string", "description": "Relative file path inside workspace"}
+                required.append("path")
+            if "write_file" in name:
+                properties["content"] = {"type": "string", "description": "Text content to write"}
+                required.append("content")
+            if "run_command" in name or "process" in name:
+                properties["command"] = {"type": "string", "description": "Shell command to execute"}
+                required.append("command")
+            if "git_commit" in name:
+                properties["message"] = {"type": "string", "description": "Commit message"}
+                required.append("message")
+            if "grep" in name or "search" in name:
+                properties["pattern"] = {"type": "string", "description": "Search regex pattern or query"}
+                required.append("pattern")
+
+            schemas.append({
+                "type": "function",
+                "function": {
+                    "name": name,
+                    "description": getattr(tool, "description", name),
+                    "parameters": {
+                        "type": "object",
+                        "properties": properties,
+                        "required": required
+                    }
+                }
+            })
+        return schemas
 
     def execute(self, tool_name: str, args: Dict[str, Any], context: Dict[str, Any] | None = None) -> Dict[str, Any]:
         if tool_name not in self.tools:
