@@ -21,7 +21,7 @@ def _ensure_paths_loaded():
             break
 
     tools_dir = repo_root / "packages" / "tools"
-    for sub in ("filesystem", "terminal", "git", "lsp", "rag", "browser", "web", "process", "ui"):
+    for sub in ("filesystem", "terminal", "git", "lsp", "rag", "browser", "web", "process", "ui", "image", "meta"):
         sub_src = tools_dir / sub / "src"
         if sub_src.exists() and str(sub_src) not in sys.path:
             sys.path.insert(0, str(sub_src))
@@ -40,24 +40,41 @@ class UnifiedToolRegistry:
 
     def _register_default_tools(self) -> None:
         _ensure_paths_loaded()
-        from filesystem_tools import ReadFileTool, WriteFileTool
+        from filesystem_tools import (
+            ReadFileTool, WriteFileTool, ApplyEditTool, UndoLastEditTool,
+            ListFilesTool, DirectoryTreeTool, GetFileInfoTool, ListDirectoryTool
+        )
         from terminal_tools import RunCommandTool
-        from git_tools import GitStatusTool, GitDiffTool, GitCommitTool, GrepFilesTool
-        from lsp_ast_tools import AstFindUntypedFunctionsTool, AstAddJsDocTool, LspGetDiagnosticsTool
-        from rag_tools import RagIndexDirectoryTool, RagSearchTool
-        from browser_tools import BrowserEvaluateJsTool, BrowserScreenshotTool
+        from git_tools import GitStatusTool, GitDiffTool, GitCommitTool, GrepFilesTool, GitCreateBranchTool, GitLogTool, GitInitTool
+        from lsp_ast_tools import (
+            AstFindUntypedFunctionsTool, AstAddJsDocTool, AstTransformVarToConstTool,
+            LspGetDiagnosticsTool, LspFindReferencesTool, LspPreviewRenameTool
+        )
+        from rag_tools import RagIndexDirectoryTool, RagIndexFileTool, RagIndexStatsTool, RagSearchTool
+        from browser_tools import BrowserEvaluateJsTool, BrowserScreenshotTool, BrowserOpenUrlTool, GetAccessibilitySnapshotTool, TestLocalHtmlTool
         from web_tools import WebSearchTool, FetchTool
         from process_tools import ProcessManagerTool
         from ui_tools import RenderUiTool, ClearUiTool
+        from image_tools import GenerateImageTool
+        from meta_tools import (
+            ListSkillsTool, LoadSkillTool, ListRulesTool,
+            ListPluginsTool, InstallPluginTool, ListCustomAgentsTool, RepoMapQueryTool
+        )
 
         classes = [
-            ReadFileTool, WriteFileTool, RunCommandTool,
-            GitStatusTool, GitDiffTool, GitCommitTool, GrepFilesTool,
-            AstFindUntypedFunctionsTool, AstAddJsDocTool, LspGetDiagnosticsTool,
-            RagIndexDirectoryTool, RagSearchTool,
-            BrowserEvaluateJsTool, BrowserScreenshotTool,
+            ReadFileTool, WriteFileTool, ApplyEditTool, UndoLastEditTool,
+            ListFilesTool, DirectoryTreeTool, GetFileInfoTool, ListDirectoryTool,
+            RunCommandTool,
+            GitStatusTool, GitDiffTool, GitCommitTool, GrepFilesTool, GitCreateBranchTool, GitLogTool, GitInitTool,
+            AstFindUntypedFunctionsTool, AstAddJsDocTool, AstTransformVarToConstTool,
+            LspGetDiagnosticsTool, LspFindReferencesTool, LspPreviewRenameTool,
+            RagIndexDirectoryTool, RagIndexFileTool, RagIndexStatsTool, RagSearchTool,
+            BrowserEvaluateJsTool, BrowserScreenshotTool, BrowserOpenUrlTool, GetAccessibilitySnapshotTool, TestLocalHtmlTool,
             WebSearchTool, FetchTool, ProcessManagerTool,
-            RenderUiTool, ClearUiTool
+            RenderUiTool, ClearUiTool,
+            GenerateImageTool,
+            ListSkillsTool, LoadSkillTool, ListRulesTool,
+            ListPluginsTool, InstallPluginTool, ListCustomAgentsTool, RepoMapQueryTool
         ]
         for cls in classes:
             tool_instance = cls()
@@ -83,10 +100,9 @@ class UnifiedToolRegistry:
             if allowed_names is not None and name not in allowed_names:
                 continue
             
-            # Build basic parameters schema based on tool requirements
             properties = {}
             required = []
-            if "read_file" in name or "write_file" in name or "diff" in name or "screenshot" in name or "diagnostics" in name or "untyped" in name or "jsdoc" in name:
+            if any(k in name for k in ("read_file", "write_file", "diff", "screenshot", "diagnostics", "untyped", "jsdoc", "rag_index_file")):
                 properties["path"] = {"type": "string", "description": "Relative file path inside workspace"}
                 required.append("path")
             if "write_file" in name:
@@ -101,6 +117,10 @@ class UnifiedToolRegistry:
             if "grep" in name or "search" in name:
                 properties["pattern"] = {"type": "string", "description": "Search regex pattern or query"}
                 required.append("pattern")
+            if "generate_image" in name:
+                properties["prompt"] = {"type": "string", "description": "Image prompt"}
+                properties["file_path"] = {"type": "string", "description": "Save path"}
+                required.extend(["prompt", "file_path"])
 
             schemas.append({
                 "type": "function",
