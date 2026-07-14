@@ -27,3 +27,4 @@ __pycache__/
 # own .git/ inside it, which git would otherwise treat as a submodule
 # reference (or silently ignore its tracked contents) if committed as-is.
 test/git_tools_sandbox_workdir/
+test/scratch_*/

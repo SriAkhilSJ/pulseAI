@@ -24,3 +24,5 @@ out/
 # IDE
 .vscode/
 .idea/
+.pytest_cache/
+.pulsecode/
