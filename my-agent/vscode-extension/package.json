@@ -7,27 +7,19 @@
     "vscode": "^1.85.0"
   },
   "categories": ["Other"],
-  "activationEvents": ["onView:pulseAgentView"],
+  "activationEvents": ["*"],
   "main": "./out/extension.js",
   "contributes": {
-    "viewsContainers": {
-      "activitybar": [
-        {
-          "id": "pulseAgent",
-          "title": "Pulse Agent",
-          "icon": "media/icon.svg"
-        }
-      ]
-    },
-    "views": {
-      "pulseAgent": [
-        {
-          "type": "webview",
-          "id": "pulseAgentView",
-          "name": "Pulse Agent"
-        }
-      ]
-    },
+    "chatParticipants": [
+      {
+        "id": "pulsecode.pulse-agent",
+        "name": "pulsecode-ai",
+        "fullName": "PulseCode AI Agent",
+        "description": "Autonomous AI coding agent",
+        "isSticky": true,
+        "locations": ["panel"]
+      }
+    ],
     "commands": [
       {
         "command": "pulseAgent.run",
